@@ -31,7 +31,7 @@ df = insurance[~insurance.duplicated(subset=['lat', 'lon'], keep=False)]
 
 ### check date range
 
-主要时间，price的time在sbology的有效期内。sbology是有一个时间range这种？
+主要check时间 (price的time在sbology的有效期内。sbology是有一个时间range这种？)
 
 ```
 company_df["start_date"] = pd.to_datetime(company_df["start_date"])

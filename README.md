@@ -9,8 +9,10 @@ df.head()
 ```
 
 ### merge data
-      一个是security level，一个是company level 
-     (直接merge就行 / 根据id join)
+
+一个是security level，一个是company level 
+(直接merge就行 / 根据id join)
+
 
 ```
 pd.merge(df1, df2, on='ID', how='left')
@@ -19,6 +21,7 @@ pd.merge(table1,table2, how='inner’', on=None, left_on=None, right_on=None, le
 ```
 
 #### 可以查看duplicates （实际没有）
+
 ```
 	dupes = df[df.duplicated(subset=["security_id", "time"], keep=False)]
 dupes.sort_values(["security_id", "time"])
@@ -27,6 +30,7 @@ df = insurance[~insurance.duplicated(subset=['lat', 'lon'], keep=False)]
 ```
 
 ### check date range
+
 主要时间，price的time在sbology的有效期内。sbology是有一个时间range这种？
 
 ```
@@ -37,6 +41,7 @@ violations = merged.loc[~mask_in_range]
 
 
 ### column A + B，然后Groupby
+
 多算出来俩新的column，groupby，求sum
 算per company or per secuirty的metrics
 

@@ -1,16 +1,16 @@
-# R1 (target 40分钟)
+# R1
 
-一个是security level，一个是company level，
+一个是security level，一个是company level
 
 ### inspect data
 
 ```
 df.head()
 ```
+
 ### merge data
       一个是security level，一个是company level 
-直接merge就行
-根据id join
+     (直接merge就行 / 根据id join)
 
 ```
 pd.merge(df1, df2, on='ID', how='left')

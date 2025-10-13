@@ -128,6 +128,103 @@ df_sorted = df_weighted.sort_values(by=['year', 'month','weighted_mkt_cap'], asc
 df_top = df_sorted.groupby(['year', 'month']).head(5)
 ```
 
+# R2
+
+data是portfolio，有好几个strategy
+
+### Plot
+- 画图（类似backtest, 每个strategy的return的图）
+- 普通的图，看某一个column长什么样子 df.plot就行
+
+假设table是
+```
+date | strategy | portfolio_value
+
+
+pivoted_df = df.pivot(index="date", columns="strategy", values="portfolio_value")
+pivoted_df.plot(title="Portfolio Value by Strategy", figsize=(10,5))
+plt.ylabel("Portfolio Value ($)")
+plt.show()
+```
+
+
+### 计算
+
+- group by, count unique element
+- 需要知道，max drawdown / sharpe ratio的概念和算法
+- 一年多少个trading day （除一下）
+
+```
+# group by
+df.groupby('column_name').filter(lambda x: x['column_name'].count() > 10)
+df.groupby("strategy")["date"].nunique()
+
+```
+
+
+#### daily return
+
+```
+df = df.sort_values(["strategy", "date"])
+df["daily_return"] = df.groupby("strategy")["portfolio_value"].pct_change()
+```
+
+
+
+#### annualized return
+
+```
+trading_days_per_year = 252
+
+# 计算总收益率
+summary = df.groupby("strategy").agg(
+    start_value = ("portfolio_value", "first"),
+    end_value = ("portfolio_value", "last"),
+    n_days = ("date", "nunique")
+)
+
+summary["total_return"] = summary["end_value"]/summary["start_value"] - 1
+summary["annualized_return"] = (1 + summary["total_return"])**(trading_days_per_year / summary["n_days"]) - 1
+```
+
+
+#### max drawdown
+
+```
+def max_drawdown(series):
+    # series: cumulative portfolio value
+    roll_max = series.cummax()
+    drawdown = 1 - series / roll_max
+    return drawdown.max()
+
+# 应用于每个策略
+mdd = df.groupby("strategy")["portfolio_value"].apply(max_drawdown)
+summary["max_drawdown"] = mdd
+```
+
+#### sharpe ratio
+
+```
+def sharpe_ratio(x):
+    return (x.mean() / x.std()) * (252**0.5)
+
+sharpe = df.groupby("strategy")["daily_return"].apply(sharpe_ratio)
+summary["sharpe_ratio"] = sharpe
+```
+
+#### risk (volatitliy, downside sharpe ratio - 亏钱的天的STD DEVIATION)
+
+
+
+
+
+## bonus question
+
+- 关于sharpe/drawdown的conceptual，跟coding无关
+- risk，portfolio的理解
+
+
+
 
 
 

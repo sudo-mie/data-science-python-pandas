@@ -1,21 +1,21 @@
-R1
+# R1
 
 一个是security level，一个是company level
 
-Pull Data
+### Pull Data
 ```
 url = "https://example.com/data.csv" # "https://example.com/data.csv.zip"
 df = pd.read_csv(url)
 
 df = pd.read_excel("https://example.com/data.xlsx", sheet_name="Sheet1")
 ```
-inspect data
+### inspect data
 
 ```
 df.head()
 df.info()
 ```
-可以查看duplicates/missing data （实际没有）
+#### 可以查看duplicates/missing data （实际没有）
 ```
 	dupes = df[df.duplicated(subset=["security_id", "time"], keep=False)]
 dupes.sort_values(["security_id", "time"])
@@ -23,10 +23,10 @@ dupes.sort_values(["security_id", "time"])
 df = insurance[~insurance.duplicated(subset=['lat', 'lon'], keep=False)]
 df.isna().sum()
 ```
-merge data
-      一个是security level，一个是company level 
-直接merge就行
-根据id join
+### merge data
+- 一个是security level，一个是company level 
+- 直接merge就行
+- 根据id join
 
 ```
 pd.merge(df1, df2, on='ID', how='left')
@@ -36,12 +36,12 @@ pd.merge(table1,table2, how='inner’', on=None, left_on=None, right_on=None, le
 # 哪些 security 行没有任何公司匹配
 no_owner = merged[merged["company_id"].isna()]
 ```
-check date range
+### check date range
 主要时间，price的time在sbology的有效期内。sbology是有一个时间range这种？
 
 TODO: 
-for date, if year, month, day are in separated columns?
-how to separate a date timestamp into different columns for year, month, day?
+- for date, if year, month, day are in separated columns?
+- how to separate a date timestamp into different columns for year, month, day?
 
 
 ```
@@ -50,9 +50,7 @@ mask_in_range = (df["time"] >= df["start_date"]) & (df["time"] <= df["end_date"]
 violations = merged.loc[~mask_in_range]
 ```
 
-
-
-Calculation: column A + B，然后Groupby
+### Calculation: column A + B，然后Groupby
 多算出来俩新的column，groupby，求sum
 算per company or per secuirty的metrics
 dollar_volume, market_cap
@@ -103,7 +101,7 @@ df.groupby('column_name').filter(lambda x: x['column_name'].count() > 10)
 
 ```
 
-会需要算cumulative （sum, prod)
+#### 会需要算cumulative （sum, prod)
 
 ```
 df["cum_sum"] = df["value"].cumsum()
@@ -127,7 +125,7 @@ df["growth_rate"] = (df["cum_revenue"] / df["prev_cum"]) - 1
 ```
 
 
-Weighted average
+### Weighted average
 
 Q: weighted monthly average market cap per company
 The way C calculates and populates the monthly total volume (to be used the denominator for weights) for each company is pretty clean
@@ -151,19 +149,19 @@ output: | year | month | company_id | weighted_mkt_cap |
 ```
 
 
-Sort选top 5
-	求出来每个月market cap最多的5个公司
-	per company的钱的排序
+### Sort选top 5
+	- 求出来每个月market cap最多的5个公司, per company的排序
 
 Q: subset the top 5 company
 
+```
 # top 5 by month
 df_sorted = df_weighted.sort_values(by=['year', 'month','weighted_mkt_cap'], ascending=[True, True, False])
 
 df_top = df_sorted.groupby(['year', 'month']).head(5)
+```
 
-
-R2
+# R2
 portfolio，好几个strategy
 
 假设table是
@@ -175,7 +173,7 @@ date            | strategy | portfolio_value
 2025.01.01 |   A          | 98000
 2025.01.01 |   B          | 99000 
 
-Load data
+### Load data
 ```
 values = pd.read_csv("your_values.csv", parse_dates=["date"], index_col="date")
 df.info()
@@ -187,7 +185,7 @@ df = df.set_index("date")                # make it the index
 # check missing value
 df.isna().sum()
 ```
-Plot
+### Plot
 
 ```
 # make sure it is sorted
@@ -202,14 +200,14 @@ plt.show()
 # pivoted_df.plot(title="Portfolio Value by Strategy", figsize=(10,5))
 # plt.show()
 ```
-Calculation
+### Calculation
 
-count unique value
+#### count unique value
 ```
 df["strategy"].nunique() / df.index.nunique()
 df[["date", "strategy"]].drop_duplicates().shape[0]
 ```
-Daily return
+#### Daily return
 ```
 df = df.sort_values(["date"]) # df = df.sort_values(["date",”strategy”])
 
@@ -218,7 +216,7 @@ df["daily_return"] = df.groupby("strategy")["portfolio_value"].pct_change()
 ```
 
 
-Cumulative return
+#### Cumulative return
 ```
 cum_ret = (1.0 + daily_ret).cumprod() - 1.0
 
@@ -228,7 +226,7 @@ ax.set_xlabel("Date");
 ax.set_ylabel("Cumulative Return")
 plt.show()
 ```
-Annualized return
+#### Annualized return
 Check date range.
 
 Clarify: Just to clarify — when you say annualized return, should I scale by the assumed 252 trading days, or use the actual calendar time between the first and last date?
@@ -262,7 +260,7 @@ ann_ret = daily_ret.apply(annualized_return)
 ```
 
 
-max drawdown
+#### max drawdown
 
 ```
 def max_drawdown(series):
@@ -275,7 +273,7 @@ max_dd = df.groupby("strategy")["portfolio_value"].apply(max_drawdown)
 summary["max_drawdown"] = max_dd
 ```
 
-sharpe ratio
+#### sharpe ratio
 assume risk-free rate ≈ 0。
 
 ```
@@ -295,23 +293,21 @@ def sharpe_ratio(d: pd.Series, rf_annual=RISK_FREE_ANNUAL_RATE):
     return float(excess.mean() / vol * np.sqrt(252)) if vol != 0 else np.nan
 
 ```
-annualized volatitliy
+#### annualized volatitliy
 ```
 ann_vol = daily_ret.std(ddof=1) * np.sqrt(252)
 ```
 
 
 
-downside sharpe ratio - 亏钱的天的STD DEVIATION
+#### downside sharpe ratio - 亏钱的天的STD DEVIATION
 TODO
 
-Any other portfolio metrics?
+#### TODO - Any other portfolio metrics?
 
-bonus question
-关于sharpe的drawdown，conceptual
-risk，portfolio的理解
-跟coding无关
-
+### bonus question
+- 关于sharpe的drawdown，conceptual, 跟coding无关
+- risk，portfolio的理解
 
 Dispersion risk: annualized volatility for noise/smoothness.
 

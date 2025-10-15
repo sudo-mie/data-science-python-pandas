@@ -41,19 +41,25 @@ no_owner = merged[merged["company_id"].isna()]
 
 TODO: 
 - for date, if year, month, day are in separated columns?
-- how to separate a date timestamp into different columns for year, month, day?
-
 
 ```
 company_df["start_date"] = pd.to_datetime(company_df["start_date"])
 mask_in_range = (df["time"] >= df["start_date"]) & (df["time"] <= df["end_date"])
 violations = merged.loc[~mask_in_range]
+
+df["year"] = df["date"].dt.year
+df["month"] = df["date"].dt.month
+df["day"] = df["date"].dt.day
+
+
 ```
 
+
+
 ### Calculation: column A + B，然后Groupby
-多算出来俩新的column，groupby，求sum
-算per company or per secuirty的metrics
-dollar_volume, market_cap
+- 多算出来俩新的column，groupby，求sum
+- 算per company or per secuirty的metrics
+ dollar_volume, market_cap
 
 
 company_df
@@ -147,19 +153,17 @@ monthly_weighted_mcap = (
 output: | year | month | company_id | weighted_mkt_cap |
 
 ```
-
-
 ### Sort选top 5
-	- 求出来每个月market cap最多的5个公司, per company的排序
+	- 求出来每个月market cap最多的5个公司
+	- per company的钱的排序
 
 Q: subset the top 5 company
 
-```
 # top 5 by month
 df_sorted = df_weighted.sort_values(by=['year', 'month','weighted_mkt_cap'], ascending=[True, True, False])
 
 df_top = df_sorted.groupby(['year', 'month']).head(5)
-```
+
 
 # R2
 portfolio，好几个strategy
@@ -184,6 +188,11 @@ df = df.set_index("date")                # make it the index
 
 # check missing value
 df.isna().sum()
+
+
+# check date is continuous
+expected = pd.bdate_range(df.index.min(), df.index.max())  # business days
+missing = expected.difference(df.index)
 ```
 ### Plot
 
@@ -196,9 +205,13 @@ ax.set_xlabel("Date")
 ax.set_ylabel("Portfolio Value")
 plt.show()
 
-# pivoted_df = df.pivot(index="date", columns="strategy", values="portfolio_value")
-# pivoted_df.plot(title="Portfolio Value by Strategy", figsize=(10,5))
-# plt.show()
+# Convert 2 to 1
+df_pivot = df.pivot(index="date", columns="strategy", values="portfolio_value")
+df_pivot.columns.name = None
+
+
+df_pivot.plot(title="Portfolio Value by Strategy", figsize=(10,5))
+plt.show()
 ```
 ### Calculation
 
@@ -216,6 +229,18 @@ df["daily_return"] = df.groupby("strategy")["portfolio_value"].pct_change()
 ```
 
 
+#### combine results to df: 
+```
+combined = pd.concat([df_values.add_suffix("_value"),
+                      cum_ret.add_suffix("_cumret")],
+                     axis=1)
+```
+
+#### total return
+```
+total_return = df.iloc[-1] / df.iloc[0] - 1
+```
+
 #### Cumulative return
 ```
 cum_ret = (1.0 + daily_ret).cumprod() - 1.0
@@ -227,19 +252,18 @@ ax.set_ylabel("Cumulative Return")
 plt.show()
 ```
 #### Annualized return
-Check date range.
-
-Clarify: Just to clarify — when you say annualized return, should I scale by the assumed 252 trading days, or use the actual calendar time between the first and last date?
-
+Check date range. If too short - flag that annualized return is not observed 
 
 ```
 Option 1: Uses actual elapsed years between start & end 
 
-def annualized_return(daily):
-    equity = (1 + daily).cumprod()
-    years = (daily.index[-1] - daily.index[0]).days / 365.25
-    return equity.iloc[-1]**(1/years) - 1
-ann_ret = daily_ret.apply(annualized_return)
+years = (df.index[-1] - df.index[0]).days / 365.25 (or 365 if no leap years)
+annualized_return = (df.iloc[-1] / df.iloc[0]) ** (1 / years) - 1
+
+
+Option 2: Assume 252 trading days
+
+annualized_return_scaled = (df.iloc[-1] / df.iloc[0]) ** (252 / len(df)) - 1
 
 summary = df.groupby("strategy").agg(
     start_value = ("portfolio_value", "first"),
@@ -247,15 +271,15 @@ summary = df.groupby("strategy").agg(
     n_days = ("date", "nunique")
 )
 summary["total_return"] = summary["end_value"]/summary["start_value"] - 1
-summary["annualized_return"] = (1 + summary["total_return"])**(trading_days_per_year / summary["n_days"]) - 1
+summary["annualized_return"] = (1 + summary["total_return"])**(252 / summary["n_days"]) - 1
 
-Option 2: Scales by number of observations
+Option 3: Scales by number of observations
 
 trading_days_per_year = 252
 def annualized_return_scaled(daily):
     total_return = (1 + daily).prod() - 1
     return (1 + total_return)**(trading_days_per_year / len(daily)) - 1
-ann_ret = daily_ret.apply(annualized_return)
+ann_ret = daily_ret.apply(annualized_return_scaled)
 
 ```
 
@@ -266,17 +290,21 @@ ann_ret = daily_ret.apply(annualized_return)
 def max_drawdown(series):
     # series: cumulative portfolio value
     roll_max = series.cummax()
-    drawdown = 1 - series / roll_max
+    drawdown = (roll_max - series) / roll_max
     return drawdown.max()
 
-max_dd = df.groupby("strategy")["portfolio_value"].apply(max_drawdown)
-summary["max_drawdown"] = max_dd
+summary["max_drawdown"] = df.groupby("strategy")["portfolio_value"].apply(max_drawdown)
+
+max_dd = df.apply(max_drawdown)
+max_dd.head()
+
 ```
 
 #### sharpe ratio
-assume risk-free rate ≈ 0。
+- assume risk-free rate ≈ 0。
 
 ```
+# annualized sharpe ratio
 def sharpe_ratio(x):
     return (x.mean() / x.std()) * (252**0.5)
 
@@ -293,7 +321,8 @@ def sharpe_ratio(d: pd.Series, rf_annual=RISK_FREE_ANNUAL_RATE):
     return float(excess.mean() / vol * np.sqrt(252)) if vol != 0 else np.nan
 
 ```
-#### annualized volatitliy
+
+#### annualized volatility
 ```
 ann_vol = daily_ret.std(ddof=1) * np.sqrt(252)
 ```
@@ -303,11 +332,13 @@ ann_vol = daily_ret.std(ddof=1) * np.sqrt(252)
 #### downside sharpe ratio - 亏钱的天的STD DEVIATION
 TODO
 
-#### TODO - Any other portfolio metrics?
+#### Any other portfolio metrics?
 
-### bonus question
+#### bonus question
 - 关于sharpe的drawdown，conceptual, 跟coding无关
 - risk，portfolio的理解
+
+
 
 Dispersion risk: annualized volatility for noise/smoothness.
 
